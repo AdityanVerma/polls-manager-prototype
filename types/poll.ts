@@ -1,20 +1,27 @@
 /**
  * Shared domain types for the AI Poll Generator prototype.
  *
- * These model the core workflow: an Asset (topic or learning content) is
- * given to the AI, which generates a Poll made up of Questions, each with
- * a set of Options. Everything lives in local state — no persistence layer.
+ * These model the core workflow: the user picks a poll type (Open or
+ * Asset) and its source input, the AI generates a Poll made up of
+ * Questions, each with a set of Options. Everything lives in local
+ * state / localStorage — no backend persistence.
  */
 
-/**
- * The source material used to generate a poll: either a free-typed topic
- * or a block of learning content (e.g. pasted text from a lesson).
- */
+/** How the poll is targeted: open to anyone, or tied to a specific asset.
+ * This is also the choice that drives what the AI generates from. */
+export type PollType = "open" | "asset";
+
+/** File/content types supported by the mock asset library. */
+export type AssetType =
+  "PDF" | "MP3" | "MP4" | "JPG" | "JPEG" | "PNG" | "HTML" | "LINK";
+
+/** A piece of learning content that an Asset Poll can be generated from. */
 export interface Asset {
   id: string;
-  type: "topic" | "content";
-  /** Raw text — either the topic prompt or the learning content body. */
-  text: string;
+  title: string;
+  assetType: AssetType;
+  categories: string[];
+  description: string;
 }
 
 export interface Option {
@@ -30,21 +37,14 @@ export interface Question {
 
 export type PollStatus = "draft" | "published";
 
-/** Where the AI should draw poll content from, chosen on the Generate page. */
-export type SourceType = "course" | "pdf" | "video" | "topic";
-
 /**
- * The request payload built from the user's source selection, sent to the
- * AI to generate a poll. `input` is either the selected asset name
- * (Course/PDF/Video) or the free-typed topic text.
+ * The request payload sent to the AI to generate a poll. Shape depends on
+ * the chosen poll type: an Open Poll is generated from a topic (+ optional
+ * description); an Asset Poll is generated from an existing asset's metadata.
  */
-export interface AIRequest {
-  sourceType: SourceType;
-  input: string;
-}
-
-/** How the poll is targeted: open to anyone, or tied to a specific asset. */
-export type PollType = "open" | "asset";
+export type AIRequest =
+  | { pollType: "open"; topic: string; description?: string }
+  | { pollType: "asset"; asset: Asset };
 
 export interface Poll {
   id: string;
@@ -52,12 +52,16 @@ export interface Poll {
   questions: Question[];
   status: PollStatus;
   createdAt: string;
-  /** The source type used to generate this poll, if any. */
-  sourceType?: SourceType;
-  /** The selected asset name this poll was generated from (Course/PDF/Video only). */
+  /** The poll type used to generate this poll (Open or Asset). */
+  sourceType?: PollType;
+  /** The topic text this poll was generated from (Open Poll only). */
+  sourceTopic?: string;
+  /** The optional additional description used for generation (Open Poll only). */
+  sourceDescription?: string;
+  /** The full asset this poll was generated from (Asset Poll only). */
+  sourceAsset?: Asset;
+  /** Convenience copy of the asset's title, for display (Asset Poll only). */
   sourceAssetName?: string;
-  /** The original topic text this poll was generated from (Topic source only). */
-  sourceTopicText?: string;
   /** Whether the poll is Open or tied to an Asset, set on the Review & Publish step. */
   pollType?: PollType;
   startDate?: string;

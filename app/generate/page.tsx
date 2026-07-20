@@ -2,7 +2,8 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import SourceTypeSelector from "@/components/SourceTypeSelector";
+import PollTypeSelector from "@/components/PollTypeSelector";
+import AssetSelector from "@/components/AssetSelector";
 import AIRequestPreview from "@/components/AIRequestPreview";
 import PollEditor from "@/components/PollEditor";
 import PollSkeleton from "@/components/PollSkeleton";
@@ -13,7 +14,7 @@ import { MOCK_ASSETS } from "@/data/assets";
 import { parsePollResponse } from "@/lib/parsePollResponse";
 import { getPolls, savePoll } from "@/lib/pollStorage";
 import { ensureAnalytics } from "@/lib/analyticsStorage";
-import type { AIRequest, Poll, SourceType } from "@/types/poll";
+import type { AIRequest, Asset, Poll, PollType } from "@/types/poll";
 
 function GenerateForm() {
   const router = useRouter();
@@ -22,9 +23,10 @@ function GenerateForm() {
   const pollId = searchParams.get("pollId");
   const isEditMode = Boolean(pollId);
 
-  const [sourceType, setSourceType] = useState<SourceType>("course");
-  const [selectedAsset, setSelectedAsset] = useState<string>(MOCK_ASSETS[0]);
-  const [topicText, setTopicText] = useState<string>("");
+  const [pollType, setPollType] = useState<PollType>("open");
+  const [topic, setTopic] = useState<string>("");
+  const [description, setDescription] = useState<string>("");
+  const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [aiRequest, setAiRequest] = useState<AIRequest | null>(null);
 
   const [isLoading, setIsLoading] = useState(false);
@@ -40,27 +42,31 @@ function GenerateForm() {
     if (!existingPoll) return;
 
     setPoll(existingPoll);
-    setSourceType(existingPoll.sourceType ?? "course");
+    const loadedPollType = existingPoll.sourceType ?? "open";
+    setPollType(loadedPollType);
 
-    if (existingPoll.sourceType === "topic") {
-      setTopicText(existingPoll.sourceTopicText ?? "");
-    } else if (existingPoll.sourceAssetName) {
-      setSelectedAsset(existingPoll.sourceAssetName);
+    if (loadedPollType === "open") {
+      setTopic(existingPoll.sourceTopic ?? "");
+      setDescription(existingPoll.sourceDescription ?? "");
+    } else if (existingPoll.sourceAsset) {
+      setSelectedAsset(existingPoll.sourceAsset);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pollId]);
 
-  const isTopic = sourceType === "topic";
-  const input = isTopic ? topicText.trim() : selectedAsset;
-  const isValid = input.length > 0;
+  const isOpenPoll = pollType === "open";
+  const isValid = isOpenPoll ? topic.trim().length > 0 : selectedAsset !== null;
 
   const handleGenerate = async () => {
     if (!isValid) return;
 
-    const request: AIRequest = {
-      sourceType,
-      input,
-    };
+    const request: AIRequest = isOpenPoll
+      ? {
+          pollType: "open",
+          topic: topic.trim(),
+          description: description.trim() || undefined,
+        }
+      : { pollType: "asset", asset: selectedAsset as Asset };
 
     console.log(request);
     setAiRequest(request);
@@ -88,12 +94,16 @@ function GenerateForm() {
         // never turns into a duplicate poll in storage.
         id: poll?.id ?? parsedPoll.id,
         status: poll?.status ?? "draft",
-        pollType: poll?.pollType ?? "asset",
+        pollType: poll?.pollType ?? pollType,
         startDate: poll?.startDate,
         endDate: poll?.endDate,
-        sourceType,
-        sourceAssetName: isTopic ? undefined : selectedAsset,
-        sourceTopicText: isTopic ? input : undefined,
+        sourceType: pollType,
+        sourceTopic: isOpenPoll ? topic.trim() : undefined,
+        sourceDescription: isOpenPoll
+          ? description.trim() || undefined
+          : undefined,
+        sourceAsset: isOpenPoll ? undefined : (selectedAsset as Asset),
+        sourceAssetName: isOpenPoll ? undefined : selectedAsset?.title,
       };
       setPoll(enrichedPoll);
     } catch (err) {
@@ -150,41 +160,49 @@ function GenerateForm() {
         Generate Poll with AI
       </h1>
       <p className="mt-2 text-sm text-zinc-600">
-        Select a source for AI to generate poll questions.
+        What type of poll do you want to create?
       </p>
 
       <section className="mt-8 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-5">
-        <label className="mb-2 block text-sm font-medium text-zinc-700">
-          Source Type
-        </label>
-        <SourceTypeSelector value={sourceType} onChange={setSourceType} />
+        <PollTypeSelector value={pollType} onChange={setPollType} />
 
         <div className="mt-5">
-          {isTopic ? (
-            <textarea
-              rows={5}
-              value={topicText}
-              onChange={(e) => setTopicText(e.target.value)}
-              placeholder="Enter the topic or describe what you want the AI to generate a poll from..."
-              className="w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-sm text-zinc-900 transition-colors placeholder:text-zinc-400 focus:border-zinc-500 focus:ring-2 focus:ring-zinc-900/10 focus:outline-none"
-            />
-          ) : (
-            <div>
-              <label className="mb-2 block text-sm font-medium text-zinc-700">
-                Select Asset
-              </label>
-              <select
-                value={selectedAsset}
-                onChange={(e) => setSelectedAsset(e.target.value)}
-                className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2.5 text-sm text-zinc-900 transition-colors focus:border-zinc-500 focus:ring-2 focus:ring-zinc-900/10 focus:outline-none"
-              >
-                {MOCK_ASSETS.map((asset) => (
-                  <option key={asset} value={asset}>
-                    {asset}
-                  </option>
-                ))}
-              </select>
+          {isOpenPoll ? (
+            <div className="space-y-4">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-zinc-700">
+                  Topic <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={topic}
+                  onChange={(e) => setTopic(e.target.value)}
+                  placeholder="e.g. Introduction to Machine Learning"
+                  className="w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-sm text-zinc-900 transition-colors placeholder:text-zinc-400 focus:border-zinc-500 focus:ring-2 focus:ring-zinc-900/10 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-zinc-700">
+                  Description{" "}
+                  <span className="font-normal text-zinc-400">
+                    (Additional Information)
+                  </span>
+                </label>
+                <textarea
+                  rows={4}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Add any extra context to help the AI generate better questions..."
+                  className="w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-sm text-zinc-900 transition-colors placeholder:text-zinc-400 focus:border-zinc-500 focus:ring-2 focus:ring-zinc-900/10 focus:outline-none"
+                />
+              </div>
             </div>
+          ) : (
+            <AssetSelector
+              assets={MOCK_ASSETS}
+              selectedAssetId={selectedAsset?.id ?? null}
+              onSelect={setSelectedAsset}
+            />
           )}
         </div>
 

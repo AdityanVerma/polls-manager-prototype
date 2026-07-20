@@ -12,16 +12,12 @@ import type { Poll } from "@/types/poll";
 
 function formatSource(poll: Poll): string {
   if (!poll.sourceType) return "—";
-  if (poll.sourceType === "topic") return "Topic";
 
-  const sourceLabel =
-    poll.sourceType === "pdf"
-      ? "PDF"
-      : poll.sourceType.charAt(0).toUpperCase() + poll.sourceType.slice(1);
+  if (poll.sourceType === "open") {
+    return poll.sourceTopic ? `Topic: ${poll.sourceTopic}` : "Topic";
+  }
 
-  return poll.sourceAssetName
-    ? `${sourceLabel}: ${poll.sourceAssetName}`
-    : sourceLabel;
+  return poll.sourceAssetName ? `Asset: ${poll.sourceAssetName}` : "Asset";
 }
 
 function formatPollType(poll: Poll): string {

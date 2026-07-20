@@ -18,7 +18,7 @@ export default function ReviewPublishPanel({
   isEditMode,
 }: ReviewPublishPanelProps) {
   const pollType: PollType = poll.pollType ?? "asset";
-  const showAssetField = pollType === "asset" && poll.sourceType !== "topic";
+  const showAssetField = pollType === "asset" && poll.sourceType !== "open";
 
   const updatePollType = (value: PollType) => {
     onChange({ ...poll, pollType: value });
