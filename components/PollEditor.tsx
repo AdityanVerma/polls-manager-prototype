@@ -6,25 +6,18 @@ interface PollEditorProps {
   poll: Poll;
   onChange: (poll: Poll) => void;
   onRegenerate: () => void;
+  onGenerateQuestion: () => void;
   isRegenerating: boolean;
-}
-
-function createEmptyQuestion(): Question {
-  return {
-    id: generateId(),
-    text: "",
-    options: Array.from({ length: 4 }, () => ({
-      id: generateId(),
-      text: "",
-    })),
-  };
+  isGeneratingQuestion: boolean;
 }
 
 export default function PollEditor({
   poll,
   onChange,
   onRegenerate,
+  onGenerateQuestion,
   isRegenerating,
+  isGeneratingQuestion,
 }: PollEditorProps) {
   const updateTitle = (title: string) => {
     onChange({ ...poll, title });
@@ -54,13 +47,6 @@ export default function PollEditor({
   const deleteQuestion = (index: number) => {
     const questions = poll.questions.filter((_, i) => i !== index);
     onChange({ ...poll, questions });
-  };
-
-  const addQuestion = () => {
-    onChange({
-      ...poll,
-      questions: [...poll.questions, createEmptyQuestion()],
-    });
   };
 
   return (
@@ -93,11 +79,20 @@ export default function PollEditor({
       <div className="flex flex-wrap gap-3">
         <button
           type="button"
-          onClick={addQuestion}
-          className="rounded-lg border border-zinc-300 px-4 py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-400 hover:bg-zinc-50"
+          onClick={onGenerateQuestion}
+          disabled={isGeneratingQuestion}
+          className="rounded-lg border border-zinc-300 px-4 py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-400 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Add Question
+          {isGeneratingQuestion ? (
+            <span className="inline-flex items-center gap-2">
+              <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-zinc-400 border-t-zinc-800" />
+              Generating Question...
+            </span>
+          ) : (
+            "✨ Generate Another Question"
+          )}
         </button>
+
         <button
           type="button"
           onClick={onRegenerate}

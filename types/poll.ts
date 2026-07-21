@@ -35,6 +35,16 @@ export interface Question {
   options: Option[];
 }
 
+export type QuestionType = "mcq" | "msq" | "both";
+
+export interface GenerationSettings {
+  topic: string;
+  instructions: string;
+  questionCount: number;
+  questionType: QuestionType;
+  isCompulsory: boolean;
+}
+
 export type PollStatus = "draft" | "published";
 
 /**
@@ -43,8 +53,15 @@ export type PollStatus = "draft" | "published";
  * description); an Asset Poll is generated from an existing asset's metadata.
  */
 export type AIRequest =
-  | { pollType: "open"; topic: string; description?: string }
-  | { pollType: "asset"; asset: Asset };
+  | {
+      pollType: "open";
+      settings: GenerationSettings;
+    }
+  | {
+      pollType: "asset";
+      asset: Asset;
+      settings: GenerationSettings;
+    };
 
 export interface Poll {
   id: string;
@@ -54,9 +71,9 @@ export interface Poll {
   createdAt: string;
   /** The poll type used to generate this poll (Open or Asset). */
   sourceType?: PollType;
-  /** The topic text this poll was generated from (Open Poll only). */
+  /** Topic used to generate this poll. */
   sourceTopic?: string;
-  /** The optional additional description used for generation (Open Poll only). */
+  /** Additional instructions provided to the AI. */
   sourceDescription?: string;
   /** The full asset this poll was generated from (Asset Poll only). */
   sourceAsset?: Asset;
@@ -66,4 +83,5 @@ export interface Poll {
   pollType?: PollType;
   startDate?: string;
   endDate?: string;
+  generationSettings?: GenerationSettings;
 }

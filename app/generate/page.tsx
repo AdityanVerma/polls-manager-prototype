@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+
 import PollTypeSelector from "@/components/PollTypeSelector";
 import AssetSelector from "@/components/AssetSelector";
 import AIRequestPreview from "@/components/AIRequestPreview";
@@ -10,10 +11,16 @@ import PollSkeleton from "@/components/PollSkeleton";
 import ReviewPublishPanel from "@/components/ReviewPublishPanel";
 import Badge from "@/components/Badge";
 import { useToast } from "@/components/ToastProvider";
+import QuestionGenerationSettings, {
+  type GenerationSettings,
+} from "@/components/QuestionGenerationSettings";
+
 import { MOCK_ASSETS } from "@/data/assets";
+
 import { parsePollResponse } from "@/lib/parsePollResponse";
 import { getPolls, savePoll } from "@/lib/pollStorage";
 import { ensureAnalytics } from "@/lib/analyticsStorage";
+
 import type { AIRequest, Asset, Poll, PollType } from "@/types/poll";
 
 function GenerateForm() {
@@ -24,12 +31,19 @@ function GenerateForm() {
   const isEditMode = Boolean(pollId);
 
   const [pollType, setPollType] = useState<PollType>("open");
-  const [topic, setTopic] = useState<string>("");
-  const [description, setDescription] = useState<string>("");
+  const [generationSettings, setGenerationSettings] =
+    useState<GenerationSettings>({
+      topic: "",
+      instructions: "",
+      questionCount: 5,
+      questionType: "both",
+      isCompulsory: false,
+    });
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [aiRequest, setAiRequest] = useState<AIRequest | null>(null);
 
   const [isLoading, setIsLoading] = useState(false);
+  const [isGeneratingQuestion, setIsGeneratingQuestion] = useState(false);
   const [poll, setPoll] = useState<Poll | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -46,8 +60,11 @@ function GenerateForm() {
     setPollType(loadedPollType);
 
     if (loadedPollType === "open") {
-      setTopic(existingPoll.sourceTopic ?? "");
-      setDescription(existingPoll.sourceDescription ?? "");
+      setGenerationSettings((prev) => ({
+        ...prev,
+        topic: existingPoll.sourceTopic ?? "",
+        instructions: existingPoll.sourceDescription ?? "",
+      }));
     } else if (existingPoll.sourceAsset) {
       setSelectedAsset(existingPoll.sourceAsset);
     }
@@ -55,7 +72,9 @@ function GenerateForm() {
   }, [pollId]);
 
   const isOpenPoll = pollType === "open";
-  const isValid = isOpenPoll ? topic.trim().length > 0 : selectedAsset !== null;
+  const isValid = isOpenPoll
+    ? generationSettings.topic.trim().length > 0
+    : selectedAsset !== null && generationSettings.topic.trim().length > 0;
 
   const handleGenerate = async () => {
     if (!isValid) return;
@@ -63,10 +82,13 @@ function GenerateForm() {
     const request: AIRequest = isOpenPoll
       ? {
           pollType: "open",
-          topic: topic.trim(),
-          description: description.trim() || undefined,
+          settings: generationSettings,
         }
-      : { pollType: "asset", asset: selectedAsset as Asset };
+      : {
+          pollType: "asset",
+          asset: selectedAsset!,
+          settings: generationSettings,
+        };
 
     console.log(request);
     setAiRequest(request);
@@ -78,7 +100,10 @@ function GenerateForm() {
       const response = await fetch("/api/generate-poll", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(request),
+        body: JSON.stringify({
+          mode: "generatePoll",
+          ...request,
+        }),
       });
 
       const data = await response.json();
@@ -98,12 +123,11 @@ function GenerateForm() {
         startDate: poll?.startDate,
         endDate: poll?.endDate,
         sourceType: pollType,
-        sourceTopic: isOpenPoll ? topic.trim() : undefined,
-        sourceDescription: isOpenPoll
-          ? description.trim() || undefined
-          : undefined,
-        sourceAsset: isOpenPoll ? undefined : (selectedAsset as Asset),
+        sourceTopic: generationSettings.topic.trim(),
+        sourceDescription: generationSettings.instructions.trim() || undefined,
+        sourceAsset: isOpenPoll ? undefined : (selectedAsset ?? undefined),
         sourceAssetName: isOpenPoll ? undefined : selectedAsset?.title,
+        generationSettings,
       };
       setPoll(enrichedPoll);
     } catch (err) {
@@ -113,6 +137,19 @@ function GenerateForm() {
       showToast(message, "error");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleGenerateQuestion = async () => {
+    if (!poll) return;
+
+    setIsGeneratingQuestion(true);
+
+    try {
+      // API call will be added in the next step.
+      console.log("Generate another question...");
+    } finally {
+      setIsGeneratingQuestion(false);
     }
   };
 
@@ -168,41 +205,25 @@ function GenerateForm() {
 
         <div className="mt-5">
           {isOpenPoll ? (
-            <div className="space-y-4">
-              <div>
-                <label className="mb-2 block text-sm font-medium text-zinc-700">
-                  Topic <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={topic}
-                  onChange={(e) => setTopic(e.target.value)}
-                  placeholder="e.g. Introduction to Machine Learning"
-                  className="w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-sm text-zinc-900 transition-colors placeholder:text-zinc-400 focus:border-zinc-500 focus:ring-2 focus:ring-zinc-900/10 focus:outline-none"
-                />
-              </div>
-              <div>
-                <label className="mb-2 block text-sm font-medium text-zinc-700">
-                  Description{" "}
-                  <span className="font-normal text-zinc-400">
-                    (Additional Information)
-                  </span>
-                </label>
-                <textarea
-                  rows={4}
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Add any extra context to help the AI generate better questions..."
-                  className="w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-sm text-zinc-900 transition-colors placeholder:text-zinc-400 focus:border-zinc-500 focus:ring-2 focus:ring-zinc-900/10 focus:outline-none"
-                />
-              </div>
-            </div>
-          ) : (
-            <AssetSelector
-              assets={MOCK_ASSETS}
-              selectedAssetId={selectedAsset?.id ?? null}
-              onSelect={setSelectedAsset}
+            <QuestionGenerationSettings
+              pollType={pollType}
+              settings={generationSettings}
+              onChange={setGenerationSettings}
             />
+          ) : (
+            <div className="space-y-6">
+              <AssetSelector
+                assets={MOCK_ASSETS}
+                selectedAssetId={selectedAsset?.id ?? null}
+                onSelect={setSelectedAsset}
+              />
+
+              <QuestionGenerationSettings
+                pollType={pollType}
+                settings={generationSettings}
+                onChange={setGenerationSettings}
+              />
+            </div>
           )}
         </div>
 
@@ -252,7 +273,9 @@ function GenerateForm() {
               poll={poll}
               onChange={setPoll}
               onRegenerate={handleGenerate}
+              onGenerateQuestion={handleGenerateQuestion}
               isRegenerating={isLoading}
+              isGeneratingQuestion={isGeneratingQuestion}
             />
           </section>
 
