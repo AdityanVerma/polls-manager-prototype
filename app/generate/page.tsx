@@ -11,9 +11,7 @@ import PollSkeleton from "@/components/PollSkeleton";
 import ReviewPublishPanel from "@/components/ReviewPublishPanel";
 import Badge from "@/components/Badge";
 import { useToast } from "@/components/ToastProvider";
-import QuestionGenerationSettings, {
-  type GenerationSettings,
-} from "@/components/QuestionGenerationSettings";
+import QuestionGenerationSettings from "@/components/QuestionGenerationSettings";
 
 import { MOCK_ASSETS } from "@/data/assets";
 
@@ -21,7 +19,21 @@ import { parsePollResponse } from "@/lib/parsePollResponse";
 import { getPolls, savePoll } from "@/lib/pollStorage";
 import { ensureAnalytics } from "@/lib/analyticsStorage";
 
-import type { AIRequest, Asset, Poll, PollType } from "@/types/poll";
+import type {
+  AIRequest,
+  Asset,
+  Poll,
+  PollType,
+  QuestionType,
+} from "@/types/poll";
+
+type GenerationSettings = {
+  topic: string;
+  instructions: string;
+  questionCount: number;
+  questionType: QuestionType;
+  isCompulsory: boolean;
+};
 
 function GenerateForm() {
   const router = useRouter();
@@ -36,14 +48,13 @@ function GenerateForm() {
       topic: "",
       instructions: "",
       questionCount: 5,
-      questionType: "both",
+      questionType: "both" as QuestionType,
       isCompulsory: false,
     });
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [aiRequest, setAiRequest] = useState<AIRequest | null>(null);
 
   const [isLoading, setIsLoading] = useState(false);
-  const [isGeneratingQuestion, setIsGeneratingQuestion] = useState(false);
   const [poll, setPoll] = useState<Poll | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -59,16 +70,19 @@ function GenerateForm() {
     const loadedPollType = existingPoll.sourceType ?? "open";
     setPollType(loadedPollType);
 
-    if (loadedPollType === "open") {
-      setGenerationSettings((prev) => ({
-        ...prev,
+    setGenerationSettings(
+      existingPoll.generationSettings ?? {
         topic: existingPoll.sourceTopic ?? "",
         instructions: existingPoll.sourceDescription ?? "",
-      }));
-    } else if (existingPoll.sourceAsset) {
+        questionCount: 5,
+        questionType: "both",
+        isCompulsory: false,
+      },
+    );
+
+    if (loadedPollType === "asset" && existingPoll.sourceAsset) {
       setSelectedAsset(existingPoll.sourceAsset);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pollId]);
 
   const isOpenPoll = pollType === "open";
@@ -137,19 +151,6 @@ function GenerateForm() {
       showToast(message, "error");
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const handleGenerateQuestion = async () => {
-    if (!poll) return;
-
-    setIsGeneratingQuestion(true);
-
-    try {
-      // API call will be added in the next step.
-      console.log("Generate another question...");
-    } finally {
-      setIsGeneratingQuestion(false);
     }
   };
 
@@ -273,9 +274,7 @@ function GenerateForm() {
               poll={poll}
               onChange={setPoll}
               onRegenerate={handleGenerate}
-              onGenerateQuestion={handleGenerateQuestion}
               isRegenerating={isLoading}
-              isGeneratingQuestion={isGeneratingQuestion}
             />
           </section>
 

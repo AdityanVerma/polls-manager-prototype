@@ -1,4 +1,4 @@
-import type { Poll, PollType } from "@/types/poll";
+import type { Poll } from "@/types/poll";
 
 interface ReviewPublishPanelProps {
   poll: Poll;
@@ -17,12 +17,8 @@ export default function ReviewPublishPanel({
   onUpdate,
   isEditMode,
 }: ReviewPublishPanelProps) {
-  const pollType: PollType = poll.pollType ?? "asset";
-  const showAssetField = pollType === "asset" && poll.sourceType !== "open";
-
-  const updatePollType = (value: PollType) => {
-    onChange({ ...poll, pollType: value });
-  };
+  const showAssetField =
+    poll.pollType === "asset" && poll.sourceType !== "open";
 
   const updateStartDate = (value: string) => {
     onChange({ ...poll, startDate: value });
@@ -37,48 +33,6 @@ export default function ReviewPublishPanel({
       <h2 className="text-lg font-semibold tracking-tight text-zinc-900">
         Review &amp; Publish
       </h2>
-
-      <div className="mt-4">
-        <span className="mb-2 block text-sm font-medium text-zinc-700">
-          Poll Type
-        </span>
-        <div className="flex flex-wrap gap-3">
-          <label
-            className={`flex cursor-pointer items-center gap-2 rounded-lg border px-4 py-2.5 text-sm transition-colors ${
-              pollType === "open"
-                ? "border-zinc-900 bg-zinc-900/5 font-medium text-zinc-900"
-                : "border-zinc-300 text-zinc-600 hover:bg-zinc-50"
-            }`}
-          >
-            <input
-              type="radio"
-              name="pollType"
-              value="open"
-              checked={pollType === "open"}
-              onChange={() => updatePollType("open")}
-              className="h-4 w-4 accent-zinc-900"
-            />
-            Open Poll
-          </label>
-          <label
-            className={`flex cursor-pointer items-center gap-2 rounded-lg border px-4 py-2.5 text-sm transition-colors ${
-              pollType === "asset"
-                ? "border-zinc-900 bg-zinc-900/5 font-medium text-zinc-900"
-                : "border-zinc-300 text-zinc-600 hover:bg-zinc-50"
-            }`}
-          >
-            <input
-              type="radio"
-              name="pollType"
-              value="asset"
-              checked={pollType === "asset"}
-              onChange={() => updatePollType("asset")}
-              className="h-4 w-4 accent-zinc-900"
-            />
-            Asset Poll
-          </label>
-        </div>
-      </div>
 
       {showAssetField && (
         <div className="mt-4">
